@@ -1,17 +1,71 @@
-import React from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import { Feather as Icon } from '@expo/vector-icons';
 import { View, Image, StyleSheet, Text, ImageBackground } from 'react-native'; 
 import { RectButton } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
+import RNPickerSelect from 'react-native-picker-select';
+import axios from 'axios';
+
+interface IBGEUFResponse {
+  sigla: string
+}
+
+interface IBGECityResponse {
+  nome: string
+}
 
 const Home = () => {
-
+  
+  const [ufs, setUfs] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [selectedCity,setSelectedCity] = useState('');
+  const [selectedUf,setselectedUf] = useState('0');
   const navigation = useNavigation();
 
   function handleNavToPoints () {
-    navigation.navigate('Points');
+    navigation.navigate('Points', {
+      uf: selectedUf,
+      city: selectedCity
+    });
   }
+  useEffect(()=>{
+    async function setuf() {
+      await axios.get<IBGEUFResponse[]>('https://servicodados.ibge.gov.br/api/v1/localidades/estados').then(response => {
+        const ufInitials = response.data.map( uf  => uf.sigla);
 
+        setUfs(ufInitials);
+    });
+    }
+    setuf();
+}, []);
+
+
+useEffect(() => {
+
+  async function setcities() {
+    await axios
+    .get<IBGECityResponse[]>(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedUf}/municipios`)
+    .then( response => {
+        const citiesNames = response.data.map( city  => city.nome);
+
+        setCities(citiesNames);
+
+    });
+
+  }
+    if (selectedUf === '0') return;
+    setcities();
+  }, [selectedUf]);
+
+function handleSelectUF(value: string) {
+  const uf = value;
+  setselectedUf(uf);
+}
+
+function handleSelectCity(value: string) {
+  const city = value;
+  setSelectedCity(city);
+}
   return (
   <ImageBackground 
   source={require('../../assets/home-background.png')} 
@@ -23,8 +77,28 @@ const Home = () => {
       <Text style={styles.title}>Seu marketplace de coleta de resíduos</Text>
       <Text style={styles.description}>Ajudamos pessoas a encontrarem pontos de coletas de forma eficiente.</Text>
     </View>
-
     <View style={styles.footer}>
+      <RNPickerSelect
+       style={pickerSelectStyles}
+      placeholder={{label: 'Escolha um Estado'}}
+      onValueChange={(value) => handleSelectUF(value)}
+      items={ufs.sort((a, b) => {
+        return a < b ? -1 : a > b ? 1 : 0;
+      }).map(uf => {
+        return {key:uf, label: uf, value: uf }
+      })}
+      />
+      {selectedUf !== '0' && (
+      <RNPickerSelect
+      style={pickerSelectStyles}
+      placeholder={{label: 'Escolha uma Cidade'}}
+      onValueChange={(value) => handleSelectCity(value)}
+      items={cities.sort((a, b) => {
+        return a < b ? -1 : a > b ? 1 : 0;
+      }).map(city => {
+        return {key: city, label: city, value: city }
+      })}
+      />)}
       <RectButton 
       style={styles.button} 
       onPress={handleNavToPoints}
@@ -114,5 +188,29 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontFamily: 'Roboto_500Medium',
     fontSize: 16,
-  }
+  },
+
+});
+
+const pickerSelectStyles = StyleSheet.create({
+  inputIOS: {
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'gray',
+    borderRadius: 4,
+    color: 'black',
+    paddingRight: 30, // to ensure the text is never behind the icon
+  },
+  inputAndroid: {
+    fontSize: 16,
+    paddingHorizontal: 30,
+    paddingVertical: 8,
+    borderWidth: 0.5,
+    borderColor: '#000',
+    borderRadius: 8,
+    color: '#000',
+    paddingRight: 30, // to ensure the text is never behind the icon
+  },
 });
